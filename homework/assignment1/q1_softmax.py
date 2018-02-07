@@ -1,5 +1,6 @@
 import numpy as np
 import random
+from q2_gradcheck import gradcheck_naive
 
 def softmax(x):
     """
@@ -24,12 +25,24 @@ def softmax(x):
     if len(x.shape)==1:
         x = x.T.reshape(1,-1)
     maxX = np.apply_along_axis(max,axis=1,arr=x)
-    x = x-maxX.reshape(-1,1)
+    if np.max(np.abs(maxX)) > 1:
+        x = x-maxX.reshape(-1,1)
     x = np.exp(x)
     den = np.apply_along_axis(sum,axis=1,arr=x)
     ### END YOUR CODE
     
     return x/den.reshape(-1,1)
+
+def softmax_grad(x):
+    if len(x.shape)==1:
+        x = x.T.reshape(1,-1)
+    maxX = np.apply_along_axis(max,axis=1,arr=x)
+    if np.max(np.abs(maxX)) > 1:
+        x = x-maxX.reshape(-1,1)
+    z = np.exp(x)
+    den = np.apply_along_axis(sum,axis=1,arr=z).reshape(-1,1)
+    return np.diag(z.reshape(-1))/den - z.T.dot(z)/den**2
+
 
 def test_softmax_basic():
     """
@@ -69,6 +82,21 @@ def test_softmax():
         [[0.26894142,  0.73105858],
          [0.26894142,  0.73105858],
          [0.26894142,  0.73105858]]))) <= 1e-6
+
+    test5 = np.array([2,2+1/10,2+1/75])
+    test5xr = test5 + np.array([1e-4,0,0])
+    test5yr = test5 + np.array([0,1e-4,0])
+    test5yl = test5 - np.array([0,1e-4,0])
+    test5xl = test5 + np.array([-1e-4,0,0])
+    test5zr = test5 + np.array([0,0,1e-4])
+    test5zl = test5 - np.array([0,0,1e-4])
+    numgradx = (softmax(test5xr)-softmax(test5xl))/(2*1e-4)
+    numgrady = (softmax(test5yr)-softmax(test5yl))/(2*1e-4)
+    numgradz = (softmax(test5zr)-softmax(test5zl))/(2*1e-4)
+    print 'x',numgradx
+    print 'y',numgrady
+    print 'z',numgradz
+    print softmax_grad(test5)
     ### END YOUR CODE  
 
 if __name__ == "__main__":

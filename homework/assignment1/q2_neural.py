@@ -1,7 +1,7 @@
 import numpy as np
 import random
 
-from q1_softmax import softmax
+from q1_softmax import softmax, softmax_grad
 from q2_sigmoid import sigmoid, sigmoid_grad
 from q2_gradcheck import gradcheck_naive
 
@@ -27,21 +27,17 @@ def forward_backward_prop(data, labels, params, dimensions):
 
     ### YOUR CODE HERE: forward propagation
     h = sigmoid(data.dot(W1)+b1)
-    yhat = softmax(h.dot(W2)+b2)
+    z = h.dot(W2)+b2
+    yhat = softmax(z)
     cost = -np.sum(labels*np.log(yhat))
     ### END YOUR CODE
     
     ### YOUR CODE HERE: backward propagation
     # gradQ holds the gradient of \sum_i y_ilog yhat_i(...)
-    gradQ = -yhat
-    gradQ[:,np.argwhere(labels==1.0)[:,1]] += 1.0
-    gradQ *= labels
-    gradb2 = np.apply_along_axis(sum,axis=0,arr=gradQ)
-    gradW2 = h.T.dot(gradQ)
-    print gradW2.shape
-    print gradQ.shape
-    print h.shape
-    print W2.shape
+    Dyhat = -labels/yhat
+    Dz2 = Dyhat.dot(softmax_grad(z))
+    gradb2 = Dz2
+    gradW2 = Dz2.dot(h.T)
     ### END YOUR CODE
     
     ### Stack gradients (do not modify)
