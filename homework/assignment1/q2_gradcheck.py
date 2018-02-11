@@ -13,7 +13,6 @@ def gradcheck_naive(f, x):
     random.setstate(rndstate)  
     fx, grad = f(x) # Evaluate function value at original point
     h = 1e-5
-    print fx, grad
     # Iterate over all indexes in x
     it = np.nditer(x, flags=['multi_index'], op_flags=['readwrite'])
     while not it.finished:

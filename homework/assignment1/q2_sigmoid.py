@@ -1,4 +1,5 @@
 import numpy as np
+from q2_gradcheck import gradcheck_naive
 
 def sigmoid(x):
     """
@@ -19,7 +20,7 @@ def sigmoid_grad(f):
     """
     
     ### YOUR CODE HERE
-    f = f*(1-f)
+    f = sigmoid(f)*(1.0-sigmoid(f))
     ### END YOUR CODE
     
     return f
@@ -32,13 +33,8 @@ def test_sigmoid_basic():
     print "Running basic tests..."
     x = np.array([[1, 2], [-1, -2]])
     f = sigmoid(x)
-    g = sigmoid_grad(f)
-    print f
-    assert np.amax(f - np.array([[0.73105858, 0.88079708], 
-        [0.26894142, 0.11920292]])) <= 1e-6
-    print g
-    assert np.amax(g - np.array([[0.19661193, 0.10499359],
-        [0.19661193, 0.10499359]])) <= 1e-6
+    g = sigmoid_grad(x)
+    assert np.amax(g - (sigmoid(x+1e-4)-sigmoid(x-1e-4))/(2e-4)) <= 1e-3
     print "You should verify these results!\n"
 
 def test_sigmoid(): 
@@ -50,14 +46,8 @@ def test_sigmoid():
     """
     print "Running your tests..."
     ### YOUR CODE HERE
-    x = np.array([[-1,3,5],[1,4,-2]])
-    f = sigmoid(x)
-    g = sigmoid_grad(x)
-    print f
-    assert np.amax(f - np.array([[0.2689414, 0.9525741, 0.9933071],
-                                 [0.7310586, 0.9820138, 0.1192029]])) <= 1e-6
-    print g
-    assert np.amax(g -(sigmoid(x+1e-3)-sigmoid(x-1e-3))/(2e-3)) <= 1e-3
+    z1=np.random.randn(20*3)
+    assert np.amax(np.abs(sigmoid_grad(z1) -(sigmoid(z1+1e-3)-sigmoid(z1-1e-3))/(2e-3))) <= 1e-3
     ### END YOUR CODE
 
 if __name__ == "__main__":
