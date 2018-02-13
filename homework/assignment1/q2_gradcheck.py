@@ -43,7 +43,7 @@ def gradcheck_naive(f, x):
     
         it.iternext() # Step to next dimension
 
-    print "Gradient check passed!"
+    print "Gradient check passed! {}".format(reldiff)
 
 def sanity_check():
     """
