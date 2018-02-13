@@ -28,6 +28,7 @@ def gradcheck_naive(f, x):
         xleft[ix] -= h
         random.setstate(rndstate)
         fright, _ = f(xright)
+        random.setstate(rndstate)
         fleft, _ = f(xleft)
         numgrad = (fright-fleft)/(2*h)
         ### END YOUR CODE

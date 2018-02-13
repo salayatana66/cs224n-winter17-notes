@@ -5,15 +5,17 @@ from q1_softmax import softmax
 from q2_gradcheck import gradcheck_naive
 from q2_sigmoid import sigmoid, sigmoid_grad
 
+from collections import Counter
 def normalizeRows(x):
     """ Row normalization function """
     # Implement a function that normalizes each row of a matrix to have unit length
     
     ### YOUR CODE HERE
-    raise NotImplementedError
+    rowSizes = np.apply_along_axis(np.linalg.norm,axis=1,arr=x)
+    
     ### END YOUR CODE
     
-    return x
+    return x/rowSizes.reshape(-1,1)
 
 def test_normalize_rows():
     print "Testing normalizeRows..."
@@ -50,7 +52,14 @@ def softmaxCostAndGradient(predicted, target, outputVectors, dataset):
     # assignment!                                                  
     
     ### YOUR CODE HERE
-    raise NotImplementedError
+    predicted = predicted.reshape(-1,1)
+    cost = -outputVectors[target,:].reshape(1,-1).dot(predicted)
+    expV = np.exp(outputVectors.dot(predicted))
+    expS = np.sum(expV)
+    cost += np.log(expS)
+    gradPred = -outputVectors[target,:].reshape(1,-1) + expV.T.dot(outputVectors)/expS
+    grad = expV.dot(predicted.reshape(1,-1))/expS
+    grad[target,:] -= predicted.reshape(-1)
     ### END YOUR CODE
     
     return cost, gradPred, grad
@@ -73,7 +82,23 @@ def negSamplingCostAndGradient(predicted, target, outputVectors, dataset,
     # assignment!
     
     ### YOUR CODE HERE
-    raise NotImplementedError
+    predicted = predicted.reshape(-1,1)
+    negIndices = np.sort(np.array([dataset.sampleTokenIdx() for l in xrange(K)]))
+    negDict = Counter(negIndices)
+    nUvc = -outputVectors[negIndices,:].dot(predicted)
+    snUvc = sigmoid(nUvc)
+    gsnUvc = sigmoid_grad(nUvc)
+    Uvc = outputVectors[target,:].dot(predicted)
+    sUvc = sigmoid(Uvc)
+    gsUvc = sigmoid_grad(Uvc)
+    cost = -np.log(sUvc)-np.sum(np.log(snUvc))
+    gradPred = -gsUvc/sUvc*outputVectors[target,:].reshape(1,-1)
+    gradPred += (gsnUvc/snUvc).T.dot(outputVectors[negIndices,:])
+    grad = np.zeros_like(outputVectors)
+    grad[target,:] = -gsUvc/sUvc * predicted.reshape(-1)
+    for i in negIndices:
+        prod = -outputVectors[i,:].dot(predicted)
+        grad[i,:] = negDict[i]*(sigmoid_grad(prod)/sigmoid(prod)).dot(predicted.reshape(1,-1))
     ### END YOUR CODE
     
     return cost, gradPred, grad
@@ -106,7 +131,18 @@ def skipgram(currentWord, C, contextWords, tokens, inputVectors, outputVectors,
     # assignment!
 
     ### YOUR CODE HERE
-    raise NotImplementedError
+    cost = 0
+    gradIn = np.zeros_like(inputVectors)
+    gradOut = np.zeros_like(outputVectors)
+    for w in contextWords:
+        _cost, _gradPred, _grad = word2vecCostAndGradient(inputVectors[
+            tokens[currentWord],:],
+                                                          tokens[w],
+                                                          outputVectors,
+                                                          dataset)
+        cost += _cost
+        gradIn[tokens[currentWord],:] += _gradPred
+        gradOut += _grad
     ### END YOUR CODE
     
     return cost, gradIn, gradOut
@@ -131,6 +167,18 @@ def cbow(currentWord, C, contextWords, tokens, inputVectors, outputVectors,
     gradOut = np.zeros(outputVectors.shape)
 
     ### YOUR CODE HERE
+    predicted = np.zeros_like(inputVectors.shape[0])
+    cDict = Counter([tokens[w] for w in contextWords])
+    for w in contextWords:
+        predicted += inputVectors[tokens[currentWord],:]
+    _cost, _gradPred, _grad = word2vecCostAndGradient(predicted,
+                                                          tokens[current_word],
+                                                          outputVectors,
+                                                          dataset)
+    cost += _cost
+    for w in contextWords:
+        gradIn[tokens[w],:] += _gradPred*cDict[tokens[w]]
+    gradOut += _grad
     raise NotImplementedError
     ### END YOUR CODE
     
@@ -180,6 +228,27 @@ def test_word2vec():
     np.random.seed(9265)
     dummy_vectors = normalizeRows(np.random.randn(10,3))
     dummy_tokens = dict([("a",0), ("b",1), ("c",2),("d",3),("e",4)])
+    print "=== Gradient check for softmax === "
+    Input = np.random.randn(10*10)
+    def sfxChecker(Input,dims,target):
+        offset = 0
+        predicted = Input[offset:dims[0]].reshape(-1,1)
+        offset += dims[0]
+        outputVectors = Input[offset:].reshape(-1,dims[0])
+        _cost, _gradPredicted, _grad = softmaxCostAndGradient(predicted, target, outputVectors, dataset)
+        return _cost, np.concatenate((_gradPredicted.flatten(),_grad.flatten()))
+    
+    gradcheck_naive(lambda Input: sfxChecker(Input,(10,4),5),Input)
+    print "=== Gradient check for negative sampling ==="
+    Input = np.random.randn(10*10)
+    def sfxChecker(Input,dims,target):
+        offset = 0
+        predicted = Input[offset:dims[0]].reshape(-1,1)
+        offset += dims[0]
+        outputVectors = Input[offset:].reshape(-1,dims[0])
+        _cost, _gradPredicted, _grad = negSamplingCostAndGradient(predicted, target, outputVectors, dataset)
+        return _cost, np.concatenate((_gradPredicted.flatten(),_grad.flatten()))
+    gradcheck_naive(lambda Input: sfxChecker(Input,(10,4),5),Input)
     print "==== Gradient check for skip-gram ===="
     gradcheck_naive(lambda vec: word2vec_sgd_wrapper(skipgram, dummy_tokens, vec, dataset, 5), dummy_vectors)
     gradcheck_naive(lambda vec: word2vec_sgd_wrapper(skipgram, dummy_tokens, vec, dataset, 5, negSamplingCostAndGradient), dummy_vectors)
