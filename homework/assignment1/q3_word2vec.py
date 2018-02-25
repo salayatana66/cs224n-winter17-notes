@@ -134,7 +134,7 @@ def skipgram(currentWord, C, contextWords, tokens, inputVectors, outputVectors,
     gradIn = np.zeros_like(inputVectors)
     gradOut = np.zeros_like(outputVectors)
     #rndstate = random.getstate()
-    for w in contextWords[1]:
+    for w in contextWords:
         #random.setstate(rndstate)  
         _cost, _gradPred, _grad = word2vecCostAndGradient(inputVectors[
             tokens[currentWord],:],
