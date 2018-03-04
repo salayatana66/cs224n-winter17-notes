@@ -3,7 +3,7 @@ import random
 
 from cs224d.data_utils import *
 
-from q1_softmax import softmax
+from q1_softmax import softmax, softmax_grad
 from q2_gradcheck import gradcheck_naive
 from q3_sgd import load_saved_params
 
@@ -21,9 +21,10 @@ def getSentenceFeature(tokens, wordVectors, sentence):
     # - sentVector: feature vector for the sentence    
     
     sentVector = np.zeros((wordVectors.shape[1],))
-    
     ### YOUR CODE HERE
-    raise NotImplementedError
+    for word in sentence:
+        sentVector += wordVectors[tokens[word],:].reshape(-1)
+        sentVector = sentVector/len(sentence)
     ### END YOUR CODE
     
     return sentVector
@@ -55,7 +56,15 @@ def softmaxRegression(features, labels, weights, regularization = 0.0, nopredict
     cost += 0.5 * regularization * np.sum(weights ** 2)
     
     ### YOUR CODE HERE: compute the gradients and predictions
-    raise NotImplementedError
+    scores = features.dot(weights)
+    pred = np.apply_along_axis(np.argmax,axis=1,arr=scores)
+    grad = np.zeros_like(weights)
+    for i in range(N):
+        _sfxGrad = softmax_grad(scores[i,:])
+        grad[:,] += features[i,:].reshape(-1,1).dot(-_sfxGrad[:,labels[i]]/prob[i,labels[i]].reshape(1,-1))
+
+    grad = grad/N
+    grad += regularization * weights
     ### END YOUR CODE
     
     if nopredictions:
@@ -90,14 +99,16 @@ def sanity_check():
 
     dummy_weights = 0.1 * np.random.randn(dimVectors, 5)
     dummy_features = np.zeros((10, dimVectors))
-    dummy_labels = np.zeros((10,), dtype=np.int32)    
+    dummy_labels = np.zeros((10,), dtype=np.int32)
+
     for i in xrange(10):
         words, dummy_labels[i] = dataset.getRandomTrainSentence()
         dummy_features[i, :] = getSentenceFeature(tokens, wordVectors, words)
+
     print "==== Gradient check for softmax regression ===="
     gradcheck_naive(lambda weights: softmaxRegression(dummy_features,
         dummy_labels, weights, 1.0, nopredictions = True), dummy_weights)
-
+    
     print "\n=== Results ==="
     print softmaxRegression(dummy_features, dummy_labels, dummy_weights, 1.0)
 
