@@ -22,7 +22,7 @@ class Config(object):
   batch_size = 64
   label_size = 5
   hidden_size = 100
-  max_epochs = 24 
+  max_epochs = 1 #24 
   early_stopping = 2
   dropout = 0.9
   lr = 0.001
@@ -97,7 +97,7 @@ class NERModel(LanguageModel):
     self.labels_placeholder = tf.placeholder(dtype = tf.float32,
                                              shape = (None, self.config.label_size))
     self.dropout_placeholder = tf.placeholder(dtype = tf.float32,
-                                              shape = (1,))
+                                              shape = ())
                                                
     ### END YOUR CODE
 
@@ -159,7 +159,7 @@ class NERModel(LanguageModel):
       ### YOUR CODE HERE
       self.L = tf.get_variable("L", shape = (len(self.wv),self.config.embed_size), dtype = tf.float32)
       window = tf.reshape(
-        tf.nn.embedding_lookup(L, self.input_placeholder),
+        tf.nn.embedding_lookup(self.L, self.input_placeholder),
         shape = (-1, self.config.window_size * self.config.embed_size)
         )
       ### END YOUR CODE
@@ -195,9 +195,7 @@ class NERModel(LanguageModel):
     ### YOUR CODE HERE
     xavier_initializer = xavier_weight_init()
     with tf.variable_scope("Layer"):
-      self.W = tf.get_variable("W", shape = (self.config.window_size*
-                                             self.config.embed_size,
-                                             self.config.hidden_size),
+      self.W = tf.get_variable("W", 
                                dtype = tf.float32,
                                initializer = xavier_initializer(
                                  (self.config.window_size*
@@ -206,13 +204,11 @@ class NERModel(LanguageModel):
                                  ) )
       self.b1 = tf.get_variable("b1", shape = (self.config.hidden_size,),
                                 dtype = tf.float32,
-                                initializer = xavier_initializer(
-                                  (self.config.hidden_size,))
-                                )
+                                initializer = tf.zeros_initializer())
+                                
       
     with tf.variable_scope("Softmax"):
-      self.U = tf.get_variable("U", shape = (self.config.hidden_size,
-                                             self.config.label_size),
+      self.U = tf.get_variable("U", 
                                dtype = tf.float32,
                                initializer = xavier_initializer(
                                  (self.config.hidden_size,
@@ -220,9 +216,7 @@ class NERModel(LanguageModel):
                                  ))
       self.b2 = tf.get_variable("b2", shape = (self.config.label_size,),
                                 dtype = tf.float32,
-                                initializer = xavier_initializer(
-                                  (self.config.label_size,))
-                                )
+                                initializer = tf.zeros_initializer())
       
     window_dropout = tf.nn.dropout(window,
                                        keep_prob = self.dropout_placeholder)
@@ -276,7 +270,10 @@ class NERModel(LanguageModel):
       train_op: The Op for training.
     """
     ### YOUR CODE HERE
-    raise NotImplementedError
+    optimizer = tf.train.AdamOptimizer(self.config.lr)
+    for reg_loss in tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES):
+      loss += reg_loss
+    train_op = optimizer.minimize(loss)
     ### END YOUR CODE
     return train_op
 
