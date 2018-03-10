@@ -92,7 +92,13 @@ class NERModel(LanguageModel):
     (Don't change the variable names)
     """
     ### YOUR CODE HERE
-    raise NotImplementedError
+    self.input_placeholder = tf.placeholder(dtype = tf.int32,
+                                            shape = (None, self.config.window_size))
+    self.labels_placeholder = tf.placeholder(dtype = tf.float32,
+                                             shape = (None, self.config.label_size))
+    self.dropout_placeholder = tf.placeholder(dtype = tf.float32,
+                                              shape = (1,))
+                                               
     ### END YOUR CODE
 
   def create_feed_dict(self, input_batch, dropout, label_batch=None):
@@ -117,7 +123,10 @@ class NERModel(LanguageModel):
       feed_dict: The feed dictionary mapping from placeholders to values.
     """
     ### YOUR CODE HERE
-    raise NotImplementedError
+    feed_dict = { self.input_placeholder : input_batch,
+                  self.dropout_placeholder : dropout }
+    if label_batch is not None:
+      feed_dict.update({ self.labels_placeholder : label_batch })
     ### END YOUR CODE
     return feed_dict
 
@@ -148,7 +157,11 @@ class NERModel(LanguageModel):
     # The embedding lookup is currently only implemented for the CPU
     with tf.device('/cpu:0'):
       ### YOUR CODE HERE
-      raise NotImplementedError
+      self.L = tf.get_variable("L", shape = (len(self.wv),self.config.embed_size), dtype = tf.float32)
+      window = tf.reshape(
+        tf.nn.embedding_lookup(L, self.input_placeholder),
+        shape = (-1, self.config.window_size * self.config.embed_size)
+        )
       ### END YOUR CODE
       return window
 
@@ -180,11 +193,53 @@ class NERModel(LanguageModel):
       output: tf.Tensor of shape (batch_size, label_size)
     """
     ### YOUR CODE HERE
-    raise NotImplementedError
+    xavier_initializer = xavier_weight_init()
+    with tf.variable_scope("Layer"):
+      self.W = tf.get_variable("W", shape = (self.config.window_size*
+                                             self.config.embed_size,
+                                             self.config.hidden_size),
+                               dtype = tf.float32,
+                               initializer = xavier_initializer(
+                                 (self.config.window_size*
+                                             self.config.embed_size,
+                                             self.config.hidden_size)
+                                 ) )
+      self.b1 = tf.get_variable("b1", shape = (self.config.hidden_size,),
+                                dtype = tf.float32,
+                                initializer = xavier_initializer(
+                                  (self.config.hidden_size,))
+                                )
+      
+    with tf.variable_scope("Softmax"):
+      self.U = tf.get_variable("U", shape = (self.config.hidden_size,
+                                             self.config.label_size),
+                               dtype = tf.float32,
+                               initializer = xavier_initializer(
+                                 (self.config.hidden_size,
+                                             self.config.label_size)
+                                 ))
+      self.b2 = tf.get_variable("b2", shape = (self.config.label_size,),
+                                dtype = tf.float32,
+                                initializer = xavier_initializer(
+                                  (self.config.label_size,))
+                                )
+      
+    window_dropout = tf.nn.dropout(window,
+                                       keep_prob = self.dropout_placeholder)
+    hidden = tf.tanh(tf.matmul(window_dropout, self.W) + self.b1)
+    hidden_dropout = tf.nn.dropout(hidden,
+                                        keep_prob = self.dropout_placeholder)
+    output = tf.matmul(hidden_dropout, self.U) + self.b2
+    tf.add_to_collection(tf.GraphKeys.REGULARIZATION_LOSSES,
+                         self.config.l2 * tf.reduce_sum(
+                           tf.square(self.W)))
+    tf.add_to_collection(tf.GraphKeys.REGULARIZATION_LOSSES,
+                         self.config.l2 * tf.reduce_sum(
+                           tf.square(self.U)))
     ### END YOUR CODE
     return output 
 
-  def add_loss_op(self, y):
+  def add_loss_op(self, pred):
     """Adds cross_entropy_loss ops to the computational graph.
 
     Hint: You can use tf.nn.softmax_cross_entropy_with_logits to simplify your
@@ -195,7 +250,9 @@ class NERModel(LanguageModel):
       loss: A 0-d tensor (scalar)
     """
     ### YOUR CODE HERE
-    raise NotImplementedError
+    loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(
+      labels = self.labels_placeholder,
+      logits = pred ))
     ### END YOUR CODE
     return loss
 
