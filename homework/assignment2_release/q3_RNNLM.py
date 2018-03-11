@@ -261,40 +261,26 @@ class RNNLM_Model(LanguageModel):
     self.initial_state = tf.zeros(shape = (tf.shape(self.inputs)[0], self.config.hidden_size),
                                   dtype = tf.float32)
     hidden_states.append(self.initial_state)
-    with tf.variable_scope("RNN"):
-      H = tf.get_variable("H", 
-                               dtype = tf.float32,
-                               initializer = tf.random_uniform(
-                                 shape = (self.config.hidden_size
-                                             self.config.hidden_size),
-                                 minval = -1.0,
-                                 maxval = 1.0))
-      I = tf.get_variable("I",
-                               dtype = tf.float32,
-                               initializer = tf.random_uniform(
-                                 shape = (self.config.embed_size,
-                                          self.config.hidden_size),
-                                 minval = -1.0,
-                                 maxval = 1.0))
-      b_1 = tf.get_variable("b_1",
+    with tf.variable_scope("RNN", reuse = tf.AUTO_REUSE):
+      for Input in inputs:
+        H = tf.get_variable("H", 
                                  dtype = tf.float32,
-                            shape = (self.config.hidden_size,),
-                            initializer = tf.zeros_initializer())
-      hidden_states.append(tf.sigmoid(tf.matmul(tf.nn.dropout(hidden_states[0],
-                                       keep_prob = self.dropout_placeholder)),H)+
-                                      tf.matmul(tf.nn.dropout(inputs[0],
-                                                              keep_prob = self.dropout_placeholder
-                                                              )), I)+
-                                      b_1))
-      rnn_outputs.append(hidden_states[1])
-
-    # iterate over the next stages
-    for Input in inputs[1:]:
-      with tf.variable_scope("RNN") as scope:
-        scope.reuse_variables()
-        H = tf.get_variable("H")
-        I = tf.get_variable("I")
-        b_1 = tf.get_variable("b_1")
+                                 initializer = tf.random_uniform(
+                                   shape = (self.config.hidden_size
+                                               self.config.hidden_size),
+                                   minval = -1.0,
+                                   maxval = 1.0))
+        I = tf.get_variable("I",
+                                 dtype = tf.float32,
+                                 initializer = tf.random_uniform(
+                                   shape = (self.config.embed_size,
+                                            self.config.hidden_size),
+                                   minval = -1.0,
+                                   maxval = 1.0))
+        b_1 = tf.get_variable("b_1",
+                                   dtype = tf.float32,
+                              shape = (self.config.hidden_size,),
+                              initializer = tf.zeros_initializer())
 
         hidden_states.append(tf.sigmoid(tf.matmul(tf.nn.dropout(hidden_states[-1],
                                                                 keep_prob =
@@ -306,8 +292,9 @@ class RNNLM_Model(LanguageModel):
                              I) +
                                         b_1))
         rnn_outputs.append(hidden_states[-1])
-      
-    self.final_state = tf.nn.dropout(rnn_outputs[-1], keep_prob = self.dropout_placeholder)
+
+    rnn_outputs[-1] =  tf.nn.dropout(rnn_outputs[-1], keep_prob = self.dropout_placeholder)
+    self.final_state = rnn_outputs[-1]
     ### END YOUR CODE
     return rnn_outputs
 
