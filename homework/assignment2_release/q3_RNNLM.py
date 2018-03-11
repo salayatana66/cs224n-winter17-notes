@@ -79,7 +79,11 @@ class RNNLM_Model(LanguageModel):
     (Don't change the variable names)
     """
     ### YOUR CODE HERE
-    raise NotImplementedError
+    self.input_placeholder = tf.placeholder(shape = (None, self.config.num_steps),
+                                            dtype = tf.int32)
+    self.labels_placeholder = tf.placeholder(shape = (None, self.config.num_steps),
+                                             dtype = tf.int32)
+    self.dropout_placeholder = tf.placeholder(shape = (), dtype = tf.float32)
     ### END YOUR CODE
   
   def add_embedding(self):
@@ -101,7 +105,15 @@ class RNNLM_Model(LanguageModel):
     # The embedding lookup is currently only implemented for the CPU
     with tf.device('/cpu:0'):
       ### YOUR CODE HERE
-      raise NotImplementedError
+      self.L = tf.get_variable("L",
+                               initializer = tf.random_uniform(shape=(len(self.vocab),
+                                                                      self.config.embed_size),
+                                                               minval=-1.0,
+                                                               maxval=1.0,dtype = tf.float32))
+      
+      lookedUp = tf.nn.embedding_lookup(self.L, self.input_placeholder)
+      inputs = [tf.squeeze(T) for T in
+                tf.split(lookedUp, self.config.num_steps, axis = 1)]
       ### END YOUR CODE
       return inputs
 
@@ -119,13 +131,22 @@ class RNNLM_Model(LanguageModel):
 
     Args:
       rnn_outputs: List of length num_steps, each of whose elements should be
-                   a tensor of shape (batch_size, embed_size).
+                   a tensor of shape (batch_size, hidden_size).
     Returns:
       outputs: List of length num_steps, each a tensor of shape
                (batch_size, len(vocab)
     """
     ### YOUR CODE HERE
-    raise NotImplementedError
+    with tf.variable_scope("ProjectionLayer"):
+      self.U = tf.get_variable("U", dtype = tf.float32,
+                               initializer = tf.random_uniform(shape = (self.config.hidden_size,
+                                                                        len(self.vocab)),
+                                                               minval = -1.0,
+                                                               maxval = 1.0))
+      self.b_2 = tf.get_variable("b_2", dtype = tf.float32, shape = (len(self.vocab),),
+                                 initializer = tf.zeros_initializer())
+      
+      outputs = [tf.matmul(R, self.U) + self.b_2 for R in rnn_outputs]                                                                  
     ### END YOUR CODE
     return outputs
 
@@ -140,7 +161,15 @@ class RNNLM_Model(LanguageModel):
       loss: A 0-d tensor (scalar)
     """
     ### YOUR CODE HERE
-    raise NotImplementedError
+    logits = tf.concat([tf.reshape(O, shape = (-1,1,len(self.vocab)))
+                        for O in output], axis = 1)
+    loss = tf.contrib.seq2seq.sequence_loss(
+      logits = logits,
+      targets = self.labels_placeholder,
+      weights = tf.ones(shape = (tf.shape(self.labels_placeholder[0],self.config.num_steps)),
+                        dtype=tf.float32))
+      
+                        
     ### END YOUR CODE
     return loss
 
@@ -164,7 +193,8 @@ class RNNLM_Model(LanguageModel):
       train_op: The Op for training.
     """
     ### YOUR CODE HERE
-    raise NotImplementedError
+    optimizer = tf.train.AdamOptimizer(self.config.lr)
+    train_op = optimizer.minimize(loss)
     ### END YOUR CODE
     return train_op
   
@@ -226,7 +256,58 @@ class RNNLM_Model(LanguageModel):
                a tensor of shape (batch_size, hidden_size)
     """
     ### YOUR CODE HERE
-    raise NotImplementedError
+    hidden_states = []
+    rnn_outputs = []
+    self.initial_state = tf.zeros(shape = (tf.shape(self.inputs)[0], self.config.hidden_size),
+                                  dtype = tf.float32)
+    hidden_states.append(self.initial_state)
+    with tf.variable_scope("RNN"):
+      H = tf.get_variable("H", 
+                               dtype = tf.float32,
+                               initializer = tf.random_uniform(
+                                 shape = (self.config.hidden_size
+                                             self.config.hidden_size),
+                                 minval = -1.0,
+                                 maxval = 1.0))
+      I = tf.get_variable("I",
+                               dtype = tf.float32,
+                               initializer = tf.random_uniform(
+                                 shape = (self.config.embed_size,
+                                          self.config.hidden_size),
+                                 minval = -1.0,
+                                 maxval = 1.0))
+      b_1 = tf.get_variable("b_1",
+                                 dtype = tf.float32,
+                            shape = (self.config.hidden_size,),
+                            initializer = tf.zeros_initializer())
+      hidden_states.append(tf.sigmoid(tf.matmul(tf.nn.dropout(hidden_states[0],
+                                       keep_prob = self.dropout_placeholder)),H)+
+                                      tf.matmul(tf.nn.dropout(inputs[0],
+                                                              keep_prob = self.dropout_placeholder
+                                                              )), I)+
+                                      b_1))
+      rnn_outputs.append(hidden_states[1])
+
+    # iterate over the next stages
+    for Input in inputs[1:]:
+      with tf.variable_scope("RNN") as scope:
+        scope.reuse_variables()
+        H = tf.get_variable("H")
+        I = tf.get_variable("I")
+        b_1 = tf.get_variable("b_1")
+
+        hidden_states.append(tf.sigmoid(tf.matmul(tf.nn.dropout(hidden_states[-1],
+                                                                keep_prob =
+                                                                self.dropout_placeholder)),
+                                                  H) +
+                                        tf.matmul(tf.nn.dropout(Input,
+                                                                keep_prob =
+                                                                self.dropout_placeholder)),
+                             I) +
+                                        b_1))
+        rnn_outputs.append(hidden_states[-1])
+      
+    self.final_state = tf.nn.dropout(rnn_outputs[-1], keep_prob = self.dropout_placeholder)
     ### END YOUR CODE
     return rnn_outputs
 

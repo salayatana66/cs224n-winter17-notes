@@ -11,6 +11,72 @@ import data_utils.ner as ner
 from utils import data_iterator
 from model import LanguageModel
 
+##########################################################################
+# Run1 : 
+#   embed_size = 50
+#   batch_size = 64
+#   label_size = 5
+#   hidden_size = 100
+#   max_epochs = 24 
+#   early_stopping = 2
+#   dropout = 0.9
+#   lr = 0.001
+#   l2 = 0.001
+#   window_size = 3
+
+#   Training loss: 0.266748040915040915
+# Training acc: 0.918520191925
+# Validation loss: 0.186214312911
+
+# [[42452    43    55   149    60]
+#  [  224  1647    12   155    56]
+#  [  318    63   820    52    15]
+#  [  638   120    29  1219    86]
+#  [  622    23     1    67  2436]]
+# Tag: O - P 0.9593 / R 0.9928
+# Tag: LOC - P 0.8687 / R 0.7865
+# Tag: MISC - P 0.8942 / R 0.6467
+# Tag: ORG - P 0.7424 / R 0.5827
+# Tag: PER - P 0.9182 / R 0.7736
+# Total time: 90.4936070442
+##########################################################################
+# Run 2
+#   embed_size = 30
+#   batch_size = 64
+#   label_size = 5
+#   hidden_size = 100
+#   max_epochs = 24 
+#   early_stopping = 2
+#   dropout = 0.9
+#   lr = 0.001
+#   l2 = 0.001
+#   window_size = 3
+
+# Tag: O - P 0.9648 / R 0.9910
+# Tag: LOC - P 0.8966 / R 0.8367
+# Tag: MISC - P 0.9036 / R 0.7098
+# Tag: ORG - P 0.7504 / R 0.6640
+# Tag: PER - P 0.9329 / R 0.7818
+# Total time: 58.5127999783
+##########################################################################
+
+#   embed_size = 50
+#   batch_size = 64
+#   label_size = 5
+#   hidden_size = 100
+#   max_epochs = 24 
+#   early_stopping = 2
+#   dropout = 0.9
+#   lr = 0.001
+#   l2 = 0.001
+#   window_size = 3
+# Tag: O - P 0.9656 / R 0.9907
+# Tag: LOC - P 0.9175 / R 0.8290
+# Tag: MISC - P 0.8988 / R 0.7216
+# Tag: ORG - P 0.7524 / R 0.6797
+# Tag: PER - P 0.9328 / R 0.7983
+# Total time: 82.0820550919
+
 class Config(object):
   """Holds model hyperparams and data information.
 
@@ -22,9 +88,9 @@ class Config(object):
   batch_size = 64
   label_size = 5
   hidden_size = 100
-  max_epochs = 1 #24 
+  max_epochs = 24 
   early_stopping = 2
-  dropout = 0.9
+  dropout = 0.8
   lr = 0.001
   l2 = 0.001
   window_size = 3
