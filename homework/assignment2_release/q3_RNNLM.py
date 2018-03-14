@@ -262,7 +262,7 @@ class RNNLM_Model(LanguageModel):
     ### YOUR CODE HERE
     hidden_states = []
     rnn_outputs = []
-    self.initial_state = tf.zeros(shape = (tf.shape(self.inputs)[0], self.config.hidden_size),
+    self.initial_state = tf.zeros(shape = (self.config.batch_size, self.config.hidden_size),
                                   dtype = tf.float32)
     hidden_states.append(self.initial_state)
     
@@ -317,7 +317,6 @@ class RNNLM_Model(LanguageModel):
     state = self.initial_state.eval()
     for step, (x, y) in enumerate(
       ptb_iterator(data, config.batch_size, config.num_steps)):
-      print(x,y)
       # We need to pass in the initial state and retrieve the final state to give
       # the RNN proper history
       feed = {self.input_placeholder: x,
@@ -365,7 +364,7 @@ def generate_text(session, model, config, starting_text='<eos>',
     feed = {model.input_placeholder: tokens[tokensPosition],
             model.initial_state: state,
             model.dropout_placeholder: 1.0}
-    state, y_proba = session.run([model.final_state, model.predictions])
+    state, y_proba = session.run([model.final_state, model.predictions],feed_dict=feed)
     tokensPosition += 1
     ### END YOUR CODE
     if tokensPosition >= tokensLength:
