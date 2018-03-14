@@ -169,7 +169,7 @@ class RNNLM_Model(LanguageModel):
     loss = tf.contrib.seq2seq.sequence_loss(
       logits = logits,
       targets = self.labels_placeholder,
-      weights = tf.ones(shape = (tf.shape(self.labels_placeholder[0],self.config.num_steps)),
+      weights = tf.ones(shape = (tf.shape(self.labels_placeholder)[0],self.config.num_steps),
                         dtype=tf.float32))
       
                         
@@ -196,8 +196,9 @@ class RNNLM_Model(LanguageModel):
       train_op: The Op for training.
     """
     ### YOUR CODE HERE
-    optimizer = tf.train.AdamOptimizer(self.config.lr)
-    train_op = optimizer.minimize(loss)
+    with tf.variable_scope("RNN", reuse=tf.AUTO_REUSE):
+      optimizer = tf.train.AdamOptimizer(self.config.lr)
+      train_op = optimizer.minimize(loss)
     ### END YOUR CODE
     return train_op
   
@@ -215,8 +216,8 @@ class RNNLM_Model(LanguageModel):
     self.predictions = [tf.nn.softmax(tf.cast(o, 'float64')) for o in self.outputs]
     # Reshape the output into len(vocab) sized chunks - the -1 says as many as
     # needed to evenly divide
-    output = tf.reshape(tf.concat(1, self.outputs), [-1, len(self.vocab)])
-    self.calculate_loss = self.add_loss_op(output)
+    output = tf.reshape(tf.concat(self.outputs,1), [-1, len(self.vocab)])
+    self.calculate_loss = self.add_loss_op(self.outputs)
     self.train_step = self.add_training_op(self.calculate_loss)
 
 
@@ -316,6 +317,7 @@ class RNNLM_Model(LanguageModel):
     state = self.initial_state.eval()
     for step, (x, y) in enumerate(
       ptb_iterator(data, config.batch_size, config.num_steps)):
+      print(x,y)
       # We need to pass in the initial state and retrieve the final state to give
       # the RNN proper history
       feed = {self.input_placeholder: x,
@@ -358,7 +360,7 @@ def generate_text(session, model, config, starting_text='<eos>',
   tokens = [model.vocab.encode(word) for word in starting_text.split()]
   tokensLength = len(tokens)
   tokensPosition = 0
-  for i in xrange(stop_length):
+  for i in range(stop_length):
     ### YOUR CODE HERE
     feed = {model.input_placeholder: tokens[tokensPosition],
             model.initial_state: state,
@@ -398,33 +400,33 @@ def test_RNNLM():
     best_val_epoch = 0
   
     session.run(init)
-    for epoch in xrange(config.max_epochs):
-      print 'Epoch {}'.format(epoch)
+    for epoch in range(config.max_epochs):
+      print( 'Epoch {}'.format(epoch))
       start = time.time()
       ###
       train_pp = model.run_epoch(
           session, model.encoded_train,
           train_op=model.train_step)
       valid_pp = model.run_epoch(session, model.encoded_valid)
-      print 'Training perplexity: {}'.format(train_pp)
-      print 'Validation perplexity: {}'.format(valid_pp)
+      print( 'Training perplexity: {}'.format(train_pp))
+      print( 'Validation perplexity: {}'.format(valid_pp))
       if valid_pp < best_val_pp:
         best_val_pp = valid_pp
         best_val_epoch = epoch
         saver.save(session, './ptb_rnnlm.weights')
       if epoch - best_val_epoch > config.early_stopping:
         break
-      print 'Total time: {}'.format(time.time() - start)
+      print( 'Total time: {}'.format(time.time() - start))
       
     saver.restore(session, 'ptb_rnnlm.weights')
     test_pp = model.run_epoch(session, model.encoded_test)
-    print '=-=' * 5
-    print 'Test perplexity: {}'.format(test_pp)
-    print '=-=' * 5
+    print( '=-=' * 5)
+    print ('Test perplexity: {}'.format(test_pp))
+    print( '=-=' * 5)
     starting_text = 'in palo alto'
     while starting_text:
-      print ' '.join(generate_sentence(
-          session, gen_model, gen_config, starting_text=starting_text, temp=1.0))
+      print( ' '.join(generate_sentence(
+          session, gen_model, gen_config, starting_text=starting_text, temp=1.0)))
       starting_text = raw_input('> ')
 
 if __name__ == "__main__":
