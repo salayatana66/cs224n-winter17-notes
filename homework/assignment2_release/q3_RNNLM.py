@@ -9,7 +9,7 @@ from utils import calculate_perplexity, get_ptb_dataset, Vocab
 from utils import ptb_iterator, sample
 
 import tensorflow as tf
-from tensorflow.python.ops.seq2seq import sequence_loss
+from tensorflow.contrib.seq2seq import sequence_loss
 from model import LanguageModel
 
 # Let's set the parameters of our model
@@ -27,13 +27,14 @@ class Config(object):
   embed_size = 50
   hidden_size = 100
   num_steps = 10
-  max_epochs = 16
+  max_epochs = 1#16
   early_stopping = 2
   dropout = 0.9
   lr = 0.001
 
 class RNNLM_Model(LanguageModel):
-
+  variablesInstanced = {"RNN": None, "Proj" : None}
+  
   def load_data(self, debug=False):
     """Loads starter word-vectors and train/dev/test data."""
     self.vocab = Vocab()
@@ -137,7 +138,7 @@ class RNNLM_Model(LanguageModel):
                (batch_size, len(vocab)
     """
     ### YOUR CODE HERE
-    with tf.variable_scope("ProjectionLayer"):
+    with tf.variable_scope("ProjectionLayer", reuse = tf.AUTO_REUSE):
       self.U = tf.get_variable("U", dtype = tf.float32,
                                initializer = tf.random_uniform(shape = (self.config.hidden_size,
                                                                         len(self.vocab)),
@@ -146,7 +147,9 @@ class RNNLM_Model(LanguageModel):
       self.b_2 = tf.get_variable("b_2", dtype = tf.float32, shape = (len(self.vocab),),
                                  initializer = tf.zeros_initializer())
       
-      outputs = [tf.matmul(R, self.U) + self.b_2 for R in rnn_outputs]                                                                  
+      outputs = [tf.matmul(R, self.U) + self.b_2 for R in rnn_outputs]
+      if RNNLM_Model.variablesInstanced["Proj"] is None:
+        RNNLM_Model.variablesInstanced["Proj"] = True
     ### END YOUR CODE
     return outputs
 
@@ -261,12 +264,13 @@ class RNNLM_Model(LanguageModel):
     self.initial_state = tf.zeros(shape = (tf.shape(self.inputs)[0], self.config.hidden_size),
                                   dtype = tf.float32)
     hidden_states.append(self.initial_state)
+    
     with tf.variable_scope("RNN", reuse = tf.AUTO_REUSE):
       for Input in inputs:
         H = tf.get_variable("H", 
                                  dtype = tf.float32,
                                  initializer = tf.random_uniform(
-                                   shape = (self.config.hidden_size
+                                   shape = (self.config.hidden_size,
                                                self.config.hidden_size),
                                    minval = -1.0,
                                    maxval = 1.0))
@@ -284,14 +288,16 @@ class RNNLM_Model(LanguageModel):
 
         hidden_states.append(tf.sigmoid(tf.matmul(tf.nn.dropout(hidden_states[-1],
                                                                 keep_prob =
-                                                                self.dropout_placeholder)),
-                                                  H) +
+                                                                self.dropout_placeholder),
+                                                  H) + 
                                         tf.matmul(tf.nn.dropout(Input,
                                                                 keep_prob =
-                                                                self.dropout_placeholder)),
-                             I) +
+                                                                self.dropout_placeholder), 
+                                                  I) + 
                                         b_1))
         rnn_outputs.append(hidden_states[-1])
+        if RNNLM_Model.variablesInstanced["RNN"] is None:
+          RNNLM_Model.variablesInstanced["RNN"] = True
 
     rnn_outputs[-1] =  tf.nn.dropout(rnn_outputs[-1], keep_prob = self.dropout_placeholder)
     self.final_state = rnn_outputs[-1]
@@ -350,14 +356,21 @@ def generate_text(session, model, config, starting_text='<eos>',
   state = model.initial_state.eval()
   # Imagine tokens as a batch size of one, length of len(tokens[0])
   tokens = [model.vocab.encode(word) for word in starting_text.split()]
+  tokensLength = len(tokens)
+  tokensPosition = 0
   for i in xrange(stop_length):
     ### YOUR CODE HERE
-    raise NotImplementedError
+    feed = {model.input_placeholder: tokens[tokensPosition],
+            model.initial_state: state,
+            model.dropout_placeholder: 1.0}
+    state, y_proba = session.run([model.final_state, model.predictions])
+    tokensPosition += 1
     ### END YOUR CODE
-    next_word_idx = sample(y_pred[0], temperature=temp)
-    tokens.append(next_word_idx)
-    if stop_tokens and model.vocab.decode(tokens[-1]) in stop_tokens:
-      break
+    if tokensPosition >= tokensLength:
+      next_word_idx = sample(y_pred[0], temperature=temp)
+      tokens.append(next_word_idx)
+      if stop_tokens and model.vocab.decode(tokens[-1]) in stop_tokens:
+        break
   output = [model.vocab.decode(word_idx) for word_idx in tokens]
   return output
 
