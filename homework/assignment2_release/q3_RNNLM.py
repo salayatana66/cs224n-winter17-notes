@@ -27,9 +27,9 @@ class Config(object):
   embed_size = 50
   hidden_size = 100
   num_steps = 10
-  max_epochs = 1#16
+  max_epochs = 40
   early_stopping = 2
-  dropout = 0.9
+  dropout = 0.7
   lr = 0.001
 
 class RNNLM_Model(LanguageModel):
@@ -113,8 +113,12 @@ class RNNLM_Model(LanguageModel):
                                                                maxval=1.0,dtype = tf.float32))
       
       lookedUp = tf.nn.embedding_lookup(self.L, self.input_placeholder)
-      inputs = [tf.squeeze(T) for T in
-                tf.split(lookedUp, self.config.num_steps, axis = 1)]
+      if self.config.batch_size > 1:
+        inputs = [tf.squeeze(T) for T in
+                  tf.split(lookedUp, self.config.num_steps, axis = 1)]
+      else:
+        inputs = [tf.reshape(tf.squeeze(tf.split(lookedUp, self.config.num_steps, axis = 1)),
+                             shape=(1,-1))]
       ### END YOUR CODE
       return inputs
 
@@ -287,13 +291,9 @@ class RNNLM_Model(LanguageModel):
                               shape = (self.config.hidden_size,),
                               initializer = tf.zeros_initializer())
 
-        hidden_states.append(tf.sigmoid(tf.matmul(tf.nn.dropout(hidden_states[-1],
-                                                                keep_prob =
-                                                                self.dropout_placeholder),
+        hidden_states.append(tf.sigmoid(tf.matmul(hidden_states[-1],
                                                   H) + 
-                                        tf.matmul(tf.nn.dropout(Input,
-                                                                keep_prob =
-                                                                self.dropout_placeholder), 
+                                        tf.matmul(tf.nn.dropout(Input,keep_prob = self.dropout_placeholder),
                                                   I) + 
                                         b_1))
         rnn_outputs.append(hidden_states[-1])
@@ -361,14 +361,15 @@ def generate_text(session, model, config, starting_text='<eos>',
   tokensPosition = 0
   for i in range(stop_length):
     ### YOUR CODE HERE
-    feed = {model.input_placeholder: tokens[tokensPosition],
-            model.initial_state: state,
+    feed = {model.input_placeholder: np.array([tokens[tokensPosition]]).reshape((-1,1)),
+            model.initial_state: state.reshape((1,-1)),
             model.dropout_placeholder: 1.0}
-    state, y_proba = session.run([model.final_state, model.predictions],feed_dict=feed)
+    with tf.variable_scope("RNNLM/RNN", reuse=tf.AUTO_REUSE):
+      state, y_pred = session.run([model.final_state,model.predictions],feed_dict=feed)
     tokensPosition += 1
     ### END YOUR CODE
     if tokensPosition >= tokensLength:
-      next_word_idx = sample(y_pred[0], temperature=temp)
+      next_word_idx = sample(y_pred[0].flatten(), temperature=temp)
       tokens.append(next_word_idx)
       if stop_tokens and model.vocab.decode(tokens[-1]) in stop_tokens:
         break
@@ -426,7 +427,7 @@ def test_RNNLM():
     while starting_text:
       print( ' '.join(generate_sentence(
           session, gen_model, gen_config, starting_text=starting_text, temp=1.0)))
-      starting_text = raw_input('> ')
+      starting_text = input('> ')
 
 if __name__ == "__main__":
     test_RNNLM()
