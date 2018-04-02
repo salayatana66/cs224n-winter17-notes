@@ -13,19 +13,19 @@ import tree as tr
 from utils import Vocab
 import six
 
-RESET_AFTER = 50
+RESET_AFTER = 200
 class Config(object):
     """Holds model hyperparams and data information.
        Model objects are passed a Config() object at instantiation.
     """
-    embed_size = 35
+    embed_size = 3
     label_size = 2
     early_stopping = 2
     anneal_threshold = 0.99
     anneal_by = 1.5
     max_epochs = 30
-    lr = 1e-4
-    l2 = 0.02
+    lr = 1e-2
+    l2 = 0
     model_name = 'rnn_embed=%d_l2=%f_lr=%f.weights'%(embed_size, l2, lr)
 
 
@@ -33,7 +33,7 @@ class RNN_Model():
 
     def load_data(self):
         """Loads train/dev/test data and builds vocabulary."""
-        self.train_data, self.dev_data, self.test_data = tr.simplified_data(700, 100, 200)
+        self.train_data, self.dev_data, self.test_data = tr.simplified_data(1500, 100, 200)
 
         # build vocab from training data
         self.vocab = Vocab()
@@ -72,12 +72,14 @@ class RNN_Model():
         with tf.variable_scope('Composition',reuse=tf.AUTO_REUSE):
             self.embedding = tf.get_variable("L", dtype = tf.float32,
                                              initializer = tf.random_uniform(shape=(len(self.vocab),
-                                                                                    self.config.embed_size)))
+                                                                                    self.config.embed_size),
+                                                                             minval = -1.0/np.sqrt(self.config.embed_size),
+          maxval = 1.0/np.sqrt(self.config.embed_size)))                                                                   
             self.W1 = tf.get_variable("W1", dtype = tf.float32,
                                            initializer = tf.random_uniform(shape = (2*self.config.embed_size,
                                                                                     self.config.embed_size),
-                                                                           minval = -1.0,
-                                                                           maxval = 1.0))
+                                                                           minval = -1.0/np.sqrt(self.config.embed_size),
+                                                                           maxval = 1.0/np.sqrt(self.config.embed_size)))
             self.b1 = tf.get_variable("b1", dtype = tf.float32, shape = (1,self.config.embed_size),
                                       initializer=tf.zeros_initializer())
 
@@ -86,8 +88,8 @@ class RNN_Model():
             ### YOUR CODE HERE
             self.U = tf.get_variable("U", dtype=tf.float32,
                                      initializer=tf.random_uniform(shape=(self.config.embed_size,self.config.label_size),
-                                                                   minval=-1.0,
-                                                                   maxval=1.0))
+                                                                   minval=-1.0/np.sqrt(self.config.embed_size),
+                                                                                       maxval=1.0/np.sqrt(self.config.embed_size)))
             self.bs = tf.get_variable("b2", dtype=tf.float32, shape = (1,self.config.label_size),
                                       initializer=tf.zeros_initializer())
             ### END YOUR CODE
@@ -161,9 +163,11 @@ class RNN_Model():
         Returns:
             loss: tensor 0-D
         """
-        loss = None
-        # YOUR CODE HERE
-        loss = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=labels,logits=logits)
+        with tf.variable_scope("Projection",reuse=tf.AUTO_REUSE):
+            loss = None
+            loss = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=labels,logits=logits)
+            loss += self.config.l2*tf.nn.l2_loss(self.U)
+            loss += self.config.l2*tf.nn.l2_loss(self.W1)
         # END YOUR CODE
         return loss
 
@@ -188,8 +192,10 @@ class RNN_Model():
         """
         train_op = None
         # YOUR CODE HERE
-        optimizer = tf.train.GradientDescentOptimizer(self.config.lr)
-        train_op = optimizer.minimize(loss)
+        with tf.variable_scope("Projection", reuse=tf.AUTO_REUSE):
+            #optimizer = tf.train.AdagradOptimizer(self.config.lr)
+            optimizer = tf.train.GradientDescentOptimizer(self.config.lr)
+            train_op = optimizer.minimize(loss)
         # END YOUR CODE
         return train_op
 
@@ -237,11 +243,6 @@ class RNN_Model():
         while step < len(self.train_data):
             with tf.Graph().as_default(), tf.Session() as sess:
                 self.add_model_vars()
-                if new_model:
-                    sess.run(tf.global_variables_initializer())
-                else:
-                    saver = tf.train.Saver()
-                    saver.restore(sess, './weights/%s.temp'%self.config.model_name)
                 for _ in range(RESET_AFTER):
                     if step>=len(self.train_data):
                         break
@@ -250,6 +251,12 @@ class RNN_Model():
                     labels = [l for l in tree.labels if l!=2]
                     loss = self.loss(logits, labels)
                     train_op = self.training(loss)
+                    if new_model:
+                        sess.run(tf.global_variables_initializer())
+                    else:
+                        saver = tf.train.Saver()
+                        saver.restore(sess, './weights/%s.temp'%self.config.model_name)
+
                     loss, _ = sess.run([loss, train_op])
                     loss_history.append(loss)
                     if verbose:                        
@@ -268,8 +275,8 @@ class RNN_Model():
         train_acc = np.equal(train_preds, train_labels).mean()
         val_acc = np.equal(val_preds, val_labels).mean()
 
-        print('Training acc (only root node): {}'.format(train_acc))
-        print('Valiation acc (only root node): {}'.format(val_acc))
+        print('Training acc (only root node): {}\n'.format(train_acc))
+        print('Validation acc (only root node): {}\n'.format(val_acc))
         print(self.make_conf(train_labels, train_preds))
         print(self.make_conf(val_labels, val_preds))
         return train_acc, val_acc, loss_history, np.mean(np.concatenate(val_losses))
