@@ -33,7 +33,7 @@ class RNN_Model():
 
     def load_data(self):
         """Loads train/dev/test data and builds vocabulary."""
-        self.train_data, self.dev_data, self.test_data = tr.simplified_data(1500, 100, 200)
+        self.train_data, self.dev_data, self.test_data = tr.simplified_data(2000, 500, 500)
 
         # build vocab from training data
         self.vocab = Vocab()
