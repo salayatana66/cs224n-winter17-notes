@@ -13,12 +13,12 @@ import tree as tr
 from utils import Vocab
 import six
 
-RESET_AFTER = 2500
+RESET_AFTER = 200
 class Config(object):
     """Holds model hyperparams and data information.
        Model objects are passed a Config() object at instantiation.
     """
-    embed_size = 35
+    embed_size = 3
     label_size = 2
     early_stopping = 2
     anneal_threshold = 0.99
@@ -33,8 +33,8 @@ class RNN_Model():
 
     def load_data(self):
         """Loads train/dev/test data and builds vocabulary."""
-        self.train_data, self.dev_data, self.test_data = tr.simplified_data(2000, 500, 500)
-        #self.train_data, self.dev_data, self.test_data = tr.simplified_data(100, 500, 500)
+        #self.train_data, self.dev_data, self.test_data = tr.simplified_data(2000, 500, 500)
+        self.train_data, self.dev_data, self.test_data = tr.simplified_data(20, 500, 500)
         # build vocab from training data
         self.vocab = Vocab()
         train_sents = [t.get_words() for t in self.train_data]
@@ -251,21 +251,16 @@ class RNN_Model():
                     labels = [l for l in tree.labels if l!=2]
                     loss = self.loss(logits, labels)
                     train_op = self.training(loss)
-                    if new_model and step == 0:
+                    if new_model:
                         sess.run(tf.global_variables_initializer())
-                    
-                    if not new_model and step == 0:
+                    else:
                         saver = tf.train.Saver()
                         saver.restore(sess, './weights/%s.temp'%self.config.model_name)
-                    # print('='*32)
-                    # print('W1 at step', step)
-                    # print(sess.run(self.W1))
-                    # print('='*32)
 
                     loss, _ = sess.run([loss, train_op])
                     loss_history.append(loss)
                     if verbose:                        
-                        sys.stdout.write('\r{} / {} :    loss = {}\n'.format(
+                        sys.stdout.write('\r{} / {} :    loss = {}'.format(
                             step, len(self.train_data), np.mean(np.concatenate(loss_history))))
                         sys.stdout.flush()
                     step+=1
