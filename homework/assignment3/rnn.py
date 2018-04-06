@@ -13,7 +13,7 @@ import tree as tr
 from utils import Vocab
 import six
 
-RESET_AFTER = 2500
+RESET_AFTER = 20
 class Config(object):
     """Holds model hyperparams and data information.
        Model objects are passed a Config() object at instantiation.
@@ -240,10 +240,13 @@ class RNN_Model():
     def run_epoch(self, new_model = False, verbose=True):
         step = 0
         loss_history = []
+        resetted=False
         while step < len(self.train_data):
             with tf.Graph().as_default(), tf.Session() as sess:
                 self.add_model_vars()
-                for _ in range(RESET_AFTER):
+                for j in range(RESET_AFTER):
+                    if j == RESET_AFTER-1:
+                        resetted=True
                     if step>=len(self.train_data):
                         break
                     tree = self.train_data[step]
@@ -257,6 +260,12 @@ class RNN_Model():
                     if not new_model and step == 0:
                         saver = tf.train.Saver()
                         saver.restore(sess, './weights/%s.temp'%self.config.model_name)
+
+                    if resetted and j==0:
+                        saver = tf.train.Saver()
+                        saver.restore(sess, './weights/%s.temp'%self.config.model_name)
+                        resetted=False
+                            
                     # print('='*32)
                     # print('W1 at step', step)
                     # print(sess.run(self.W1))
