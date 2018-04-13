@@ -18,14 +18,14 @@ class Config(object):
     """Holds model hyperparams and data information.
        Model objects are passed a Config() object at instantiation.
     """
-    embed_size = 35
+    embed_size = 15
     label_size = 2
     early_stopping = 2
     anneal_threshold = 0.99
     anneal_by = 1.5
     max_epochs = 30
     lr = 1e-2
-    l2 = 0
+    l2 = 2e-3
     model_name = 'rnn_embed=%d_l2=%f_lr=%f.weights'%(embed_size, l2, lr)
 
 
